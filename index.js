@@ -3,7 +3,7 @@ const cors = require('cors');
 require('dotenv').config()
 const app = express();
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // MIDDLEWARE
 app.use(cors());
@@ -19,12 +19,43 @@ async function run() {
     await client.connect();
     const productCollection = client.db('amazondb').collection('products');
 
+    // get data
     app.get('/product', async (req, res) => {
+      console.log('query', req.query);
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
       const query = {};
       const cursor = productCollection.find(query);
-      const products = await cursor.toArray();
+
+      let products;
+      if (page || size) {
+        products = await cursor.skip(page * size).limit(size).toArray();
+      }
+      else {
+        products = await cursor.toArray();
+      }
+
       res.send(products)
     });
+
+    // count data
+    app.get('/productCount', async (req, res) => {
+      const count = await productCollection.estimatedDocumentCount();
+      res.json({ count })
+    });
+
+    // use post go get product by keys
+    app.post('/productByKeys', async(req, res) =>{
+      const keys = req.body;
+      const ids = keys.map(id => ObjectId(id));
+      const query = {_id: {$in: ids}}
+      const cursor = productCollection.find(query);
+      const products = await cursor.toArray();
+      console.log(keys);
+      res.send(products);
+  })
+
+
   }
   finally { }
 };
